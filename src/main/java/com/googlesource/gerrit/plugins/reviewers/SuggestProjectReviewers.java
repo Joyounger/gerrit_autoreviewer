@@ -33,6 +33,8 @@ import com.google.inject.Inject;
 import com.google.inject.Provider;
 import java.io.IOException;
 import java.util.List;
+
+import org.eclipse.jgit.errors.ConfigInvalidException;
 import org.eclipse.jgit.lib.Config;
 
 public class SuggestProjectReviewers extends SuggestReviewers
@@ -53,7 +55,7 @@ public class SuggestProjectReviewers extends SuggestReviewers
 
   @Override
   public List<SuggestedReviewerInfo> apply(ProjectResource rsrc)
-      throws BadRequestException, OrmException, IOException {
+      throws BadRequestException, OrmException, IOException, ConfigInvalidException {
     return reviewersUtil.suggestReviewers(null, this, rsrc.getControl(), getVisibility(rsrc), true);
   }
 

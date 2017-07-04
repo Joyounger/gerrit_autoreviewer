@@ -144,7 +144,7 @@ class PutReviewers implements RestModifyView<ProjectResource, Input> {
           throw new ResourceNotFoundException("Account or group " + reviewer + " not found");
         }
       }
-    } catch (OrmException e) {
+    } catch (OrmException | IOException | ConfigInvalidException e) {
       log.error("Failed to resolve account " + reviewer);
     }
   }
