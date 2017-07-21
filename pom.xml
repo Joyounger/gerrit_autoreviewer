@@ -22,7 +22,7 @@ limitations under the License.
   <groupId>com.googlesource.gerrit.plugins.reviewers</groupId>
   <artifactId>reviewers</artifactId>
   <packaging>jar</packaging>
-  <version>2.14-SNAPSHOT</version>
+  <version>2.14.1</version>
   <name>reviewers</name>
 
   <properties>
@@ -67,7 +67,7 @@ limitations under the License.
       <plugin>
         <groupId>org.codehaus.mojo</groupId>
         <artifactId>gwt-maven-plugin</artifactId>
-        <version>2.7.0</version>
+        <version>2.8.0</version>
         <configuration>
           <module>com.googlesource.gerrit.plugins.reviewers.ReviewersForm</module>
           <disableClassMetadata>true</disableClassMetadata>
@@ -100,7 +100,7 @@ limitations under the License.
     <dependency>
      <groupId>com.google.gwt</groupId>
       <artifactId>gwt-user</artifactId>
-      <version>2.7.0</version>
+      <version>2.8.0</version>
       <scope>provided</scope>
     </dependency>
   </dependencies>

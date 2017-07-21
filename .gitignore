@@ -4,8 +4,6 @@
 /.settings
 /local.properties
 *.pyc
-/bazel-bin
-/bazel-genfiles
-/bazel-out
-/bazel-reviewers
-/bazel-testlogs
+/.primary_build_tool
+/bazel-*
+/eclipse-out
