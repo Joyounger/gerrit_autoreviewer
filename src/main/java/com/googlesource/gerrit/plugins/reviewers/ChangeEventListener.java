@@ -33,8 +33,8 @@ import com.google.gerrit.reviewdb.client.Project;
 import com.google.gerrit.reviewdb.server.ReviewDb;
 import com.google.gerrit.server.CurrentUser;
 import com.google.gerrit.server.IdentifiedUser;
-import com.google.gerrit.server.account.AccountByEmailCache;
 import com.google.gerrit.server.account.AccountResolver;
+import com.google.gerrit.server.account.Emails;
 import com.google.gerrit.server.account.GroupMembers;
 import com.google.gerrit.server.config.PluginConfigFactory;
 import com.google.gerrit.server.git.GitRepositoryManager;
@@ -67,7 +67,7 @@ class ChangeEventListener implements RevisionCreatedListener, DraftPublishedList
   private static final Logger log = LoggerFactory.getLogger(ChangeEventListener.class);
 
   private final AccountResolver accountResolver;
-  private final AccountByEmailCache byEmailCache;
+  private final Emails emails;
   private final Provider<GroupsCollection> groupsCollection;
   private final GroupMembers.Factory groupMembersFactory;
   private final DefaultReviewers.Factory reviewersFactory;
@@ -85,7 +85,7 @@ class ChangeEventListener implements RevisionCreatedListener, DraftPublishedList
   @Inject
   ChangeEventListener(
       final AccountResolver accountResolver,
-      final AccountByEmailCache byEmailCache,
+      final Emails emails,
       final Provider<GroupsCollection> groupsCollection,
       final GroupMembers.Factory groupMembersFactory,
       final DefaultReviewers.Factory reviewersFactory,
@@ -101,7 +101,7 @@ class ChangeEventListener implements RevisionCreatedListener, DraftPublishedList
       final PluginConfigFactory cfgFactory,
       @PluginName String pluginName) {
     this.accountResolver = accountResolver;
-    this.byEmailCache = byEmailCache;
+    this.emails = emails;
     this.groupsCollection = groupsCollection;
     this.groupMembersFactory = groupMembersFactory;
     this.reviewersFactory = reviewersFactory;
@@ -261,13 +261,13 @@ class ChangeEventListener implements RevisionCreatedListener, DraftPublishedList
         log.error("Failed to resolve account " + r, e);
         continue;
       }
-      if (groupMembers == null) {
-        groupMembers =
-            groupMembersFactory.create(
-                identifiedUserFactory.create(
-                    Iterables.getOnlyElement(byEmailCache.get(uploaderEMail))));
-      }
       try {
+        if (groupMembers == null) {
+          groupMembers =
+              groupMembersFactory.create(
+                  identifiedUserFactory.create(
+                      Iterables.getOnlyElement(emails.getAccountFor(uploaderEMail))));
+        }
         reviewers.addAll(
             groupMembers.listAccounts(groupsCollection.get().parse(r).getGroupUUID(), p));
       } catch (UnprocessableEntityException | NoSuchGroupException e) {
