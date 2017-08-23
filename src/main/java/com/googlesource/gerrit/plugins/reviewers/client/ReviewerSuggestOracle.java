@@ -92,13 +92,14 @@ public class ReviewerSuggestOracle extends SuggestOracle {
               NativeMap<JavaScriptObject> map1 = result.get(key0).cast();
               for (String key1 : keys1) {
                 NativeMap<JavaScriptObject> map2 = map1.get(key1).cast();
-                String name = map2.get(NAME_KEY).toString();
                 if (ACCOUNT_KEY.equals(key1)) {
+                  String name = map2.get(NAME_KEY).toString();
                   String email =
                       (map2.containsKey(EMAIL_KEY)) ? map2.get(EMAIL_KEY).toString() : "";
                   String accountId = map2.get(ACCOUNT_ID_KEY).toString();
                   suggestions.add(new ReviewerSuggestion(req.getQuery(), name, email, accountId));
                 } else if (GROUP_KEY.equals(key1)) {
+                  String name = map2.get(NAME_KEY).toString();
                   suggestions.add(new ReviewerSuggestion(req.getQuery(), name));
                 }
               }
