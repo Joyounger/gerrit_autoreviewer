@@ -18,7 +18,6 @@ import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.Iterables;
 import com.google.common.collect.Sets;
 import com.google.gerrit.common.EventListener;
 import com.google.gerrit.common.errors.NoSuchGroupException;
@@ -29,9 +28,9 @@ import com.google.gerrit.reviewdb.client.Project;
 import com.google.gerrit.reviewdb.server.ReviewDb;
 import com.google.gerrit.server.CurrentUser;
 import com.google.gerrit.server.IdentifiedUser;
-import com.google.gerrit.server.account.AccountByEmailCache;
 import com.google.gerrit.server.account.AccountResolver;
 import com.google.gerrit.server.account.GroupMembers;
+import com.google.gerrit.server.data.AccountAttribute;
 import com.google.gerrit.server.data.ChangeAttribute;
 import com.google.gerrit.server.events.DraftPublishedEvent;
 import com.google.gerrit.server.events.Event;
@@ -68,7 +67,6 @@ class ChangeEventListener implements EventListener {
       .getLogger(ChangeEventListener.class);
 
   private final AccountResolver accountResolver;
-  private final AccountByEmailCache byEmailCache;
   private final Provider<GroupsCollection> groupsCollection;
   private final GroupMembers.Factory groupMembersFactory;
   private final DefaultReviewers.Factory reviewersFactory;
@@ -85,7 +83,6 @@ class ChangeEventListener implements EventListener {
   @Inject
   ChangeEventListener(
       final AccountResolver accountResolver,
-      final AccountByEmailCache byEmailCache,
       final Provider<GroupsCollection> groupsCollection,
       final GroupMembers.Factory groupMembersFactory,
       final DefaultReviewers.Factory reviewersFactory,
@@ -99,7 +96,6 @@ class ChangeEventListener implements EventListener {
       final Provider<CurrentUser> user,
       final ChangeQueryBuilder queryBuilder) {
     this.accountResolver = accountResolver;
-    this.byEmailCache = byEmailCache;
     this.groupsCollection = groupsCollection;
     this.groupMembersFactory = groupMembersFactory;
     this.reviewersFactory = reviewersFactory;
@@ -120,17 +116,17 @@ class ChangeEventListener implements EventListener {
       PatchSetCreatedEvent e = (PatchSetCreatedEvent) event;
       ChangeAttribute c = e.change.get();
       onEvent(new Project.NameKey(c.project),
-          Integer.parseInt(e.change.get().number), e.uploader.get().email);
+          Integer.parseInt(e.change.get().number), e.uploader.get());
     } else if (event instanceof DraftPublishedEvent) {
       DraftPublishedEvent e = (DraftPublishedEvent) event;
       ChangeAttribute c = e.change.get();
       onEvent(new Project.NameKey(c.project),
-          Integer.parseInt(e.change.get().number), e.uploader.get().email);
+          Integer.parseInt(e.change.get().number), e.uploader.get());
     }
   }
 
   private void onEvent(Project.NameKey projectName, int changeNumber,
-      String email) {
+      AccountAttribute uploader) {
 
     // TODO(davido): we have to cache per project configuration
     ReviewersConfig config = configFactory.create(projectName);
@@ -152,7 +148,7 @@ class ChangeEventListener implements EventListener {
 
       final Change change = changeData.change();
       final Runnable task = reviewersFactory.create(change,
-          toAccounts(reviewDb, reviewers, projectName, email));
+          toAccounts(reviewDb, reviewers, projectName, uploader));
 
       workQueue.getDefaultQueue().submit(new Runnable() {
         ReviewDb db = null;
@@ -237,7 +233,7 @@ class ChangeEventListener implements EventListener {
   }
 
   private Set<Account> toAccounts(ReviewDb reviewDb, Set<String> in,
-      Project.NameKey p, String uploaderEMail) {
+      Project.NameKey p, AccountAttribute uploader) {
     Set<Account> reviewers = Sets.newHashSetWithExpectedSize(in.size());
     GroupMembers groupMembers = null;
     for (String r : in) {
@@ -254,13 +250,31 @@ class ChangeEventListener implements EventListener {
         continue;
       }
       if (groupMembers == null) {
-        groupMembers =
-            groupMembersFactory.create(identifiedUserFactory.create(Iterables
-                .getOnlyElement(byEmailCache.get(uploaderEMail))));
+        // email is not unique to one account, try to locate the account using
+        // "Full name <email>" to increase chance of finding only one.
+        String uploaderNameEmail = String.format("%s <%s>", uploader.name, uploader.email);
+        try {
+          Account uploaderAccount =
+              accountResolver.findByNameOrEmail(reviewDb, uploaderNameEmail);
+          if (uploaderAccount != null) {
+            groupMembers = groupMembersFactory
+                .create(identifiedUserFactory.create(uploaderAccount.getId()));
+          }
+        } catch (OrmException e) {
+          log.warn(String.format(
+              "Failed to list accounts for group %s, cannot retrieve uploader account %s",
+              r, uploaderNameEmail), e);
+        }
       }
       try {
-        reviewers.addAll(groupMembers.listAccounts(
-            groupsCollection.get().parse(r).getGroupUUID(), p));
+        if (groupMembers != null) {
+          reviewers.addAll(groupMembers
+              .listAccounts(groupsCollection.get().parse(r).getGroupUUID(), p));
+        } else {
+          log.warn(String.format(
+              "Failed to list accounts for group %s; cannot retrieve uploader account for %s",
+              r, uploader.email));
+        }
       } catch (UnprocessableEntityException | NoSuchGroupException e) {
         log.warn(String.format(
             "Reviewer %s is neither an account nor a group", r));
